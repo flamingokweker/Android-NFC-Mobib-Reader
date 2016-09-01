@@ -45,29 +45,28 @@ public class IsoDepTransceiver implements Runnable {
             //onMessageReceived.onMessage(response);
             byte[] record = { (byte) 0x94, (byte)0xB2, 0x01, 0x04, 0x1D };
             response = isoDep.transceive(record);
+            if (response != null) {
+                byte[] contractcounters = new byte[16];
+                for (int i = 0; i < 16; i++) {
+                    contractcounters[i] = (byte) (response[(i * 3) + 1] + response[(i * 3) + 2] + response[(i * 3) + 3]);
+                }
+                int i = 0;
+                for (i = 0; i < 16; i++) {
+                    byte[] message = ("Ticket " + (i + 1) + ": ").getBytes();
+                    byte[] logmessage = new byte[message.length + 2];
+                    System.arraycopy(message, 0, logmessage, 0, message.length);
+                    byte[] currentcounter = new byte[1];
+                    currentcounter[0] = contractcounters[i];
+                    byte[] currentcounterbytes = bytesToHex(currentcounter).getBytes();
+                    logmessage[logmessage.length - 2] = currentcounterbytes[0];
+                    logmessage[logmessage.length - 1] = currentcounterbytes[1];
+                    onMessageReceived.onMessage(logmessage);
+                    i++;
+                }
+            }
           }
         catch (IOException e) {
-            //onMessageReceived.onError(e);
-        }
-        finally {
-            byte[] contractcounters = new byte[16];
-            for(int i = 0;i<5; i++){
-                contractcounters[i] = (byte) (response[(i*3)+1] + response[(i*3)+2] + response[(i*3)+3]);
-            }
-            int i = 0;
-              while (contractcounters[i] > 0){
-                byte[] message = ("Ticket " + (i+1) + ": ").getBytes();
-                 byte[] logmessage = new byte[message.length + 2];
-                 System.arraycopy(message, 0, logmessage, 0, message.length);
-                  byte[] currentcounter = new byte[1];
-                  currentcounter[0] = contractcounters[i];
-                  byte[]  currentcounterbytes = bytesToHex(currentcounter).getBytes();
-                 logmessage[logmessage.length-2] = currentcounterbytes[0];
-                  logmessage[logmessage.length-1] = currentcounterbytes[1];
-                onMessageReceived.onMessage(logmessage);
-            i++;
-              }
-          //  isoDep.close();
+            onMessageReceived.onError(e);
         }
     }
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();

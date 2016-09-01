@@ -71,6 +71,9 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
 
     @Override
     public void onError(Exception exception) {
-        onMessage(exception.getMessage().getBytes());
+        String errormsg = exception.getMessage();
+        if(errormsg != null) {
+            onMessage(errormsg.getBytes());
+        }
     }
 }
