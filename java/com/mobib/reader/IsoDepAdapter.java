@@ -20,10 +20,13 @@ public class IsoDepAdapter extends BaseAdapter {
     }
 
     public void addMessage(String message) {
-        messageCounter++;
 
         messages.add( message);
         notifyDataSetChanged();
+    }
+
+    public void clearMessages(){
+        messages.clear();
     }
 
     @Override

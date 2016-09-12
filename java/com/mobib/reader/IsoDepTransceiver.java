@@ -1,9 +1,8 @@
 package com.mobib.reader;
 
-import java.io.IOException;
-
 import android.nfc.tech.IsoDep;
-import android.util.Log;
+
+import java.io.IOException;
 
 public class IsoDepTransceiver implements Runnable {
 
@@ -13,60 +12,61 @@ public class IsoDepTransceiver implements Runnable {
         void onMessage(byte[] message);
 
         void onError(Exception exception);
+
+        void clearmessages();
     }
 
     private IsoDep isoDep;
     private OnMessageReceived onMessageReceived;
+    private byte[] select_apdu;
+    private byte[] readrecord_apdu;
 
     public IsoDepTransceiver(IsoDep isoDep, OnMessageReceived onMessageReceived) {
         this.isoDep = isoDep;
         this.onMessageReceived = onMessageReceived;
-    }
-
-    private static final byte[] CLA_INS_P1_P2 = { (byte) 0x94, (byte)0xA4, 0x00, 0x00 };
-    private static final byte[] AID_ANDROID = { (byte)0x20, 0x69};
-
-    private byte[] createSelectAidApdu(byte[] aid) {
-        byte[] result = new byte[6 + aid.length];
-        System.arraycopy(CLA_INS_P1_P2, 0, result, 0, CLA_INS_P1_P2.length);
-        result[4] = (byte)aid.length;
-        System.arraycopy(aid, 0, result, 5, aid.length);
-        result[result.length - 1] = 0;
-        return result;
+        this.select_apdu = new byte[] { (byte) 0x94, (byte)0xA4, 0x00, 0x00, (byte) 0x02, (byte)0x20, 0x69, 0x00 };
+        this.readrecord_apdu = new byte[] { (byte) 0x94, (byte)0xB2, 0x01, 0x04, 0x1D };
     }
 
     @Override
     public void run() {
-        int messageCounter = 0;
-        byte[] response = new byte[0];
-        try {
+
+        boolean errorfound = false;
+        onMessageReceived.clearmessages();
+        try{
+            isoDep.close();
             isoDep.connect();
-            response = isoDep.transceive(createSelectAidApdu(AID_ANDROID));
-            //onMessageReceived.onMessage(response);
-            byte[] record = { (byte) 0x94, (byte)0xB2, 0x01, 0x04, 0x1D };
-            response = isoDep.transceive(record);
-            if (response != null) {
-                byte[] contractcounters = new byte[16];
-                for (int i = 0; i < 16; i++) {
-                    contractcounters[i] = (byte) (response[(i * 3) + 1] + response[(i * 3) + 2] + response[(i * 3) + 3]);
+        }
+        catch(IOException e)
+        {
+            errorfound = true;
+            onMessageReceived.onMessage("Unable to connect to card, please try again!".getBytes());
+        }
+        if(!errorfound) {
+            try {
+                byte[] response = new byte[0];
+                isoDep.transceive(select_apdu);
+                response = isoDep.transceive(readrecord_apdu);
+                if (response != null) {
+                    byte contractcounters;
+                    for (int i = 0; i < 6; i++) {
+                        contractcounters = (byte) (response[(i * 3)] + response[(i * 3) + 1] + response[(i * 3) + 2]);
+                        byte[] message = ("Ticket " + (i + 1) + ": ").getBytes();
+                        byte[] ridesleftmsg = " rides left.".getBytes();
+                        byte[] logmessage = new byte[message.length + ridesleftmsg.length + 2];
+                        System.arraycopy(message, 0, logmessage, 0, message.length);
+                        byte[] currentcounter = new byte[1];
+                        currentcounter[0] = contractcounters;
+                        byte[] currentcounterbytes = bytesToHex(currentcounter).getBytes();
+                        logmessage[message.length] = currentcounterbytes[0];
+                        logmessage[message.length + 1] = currentcounterbytes[1];
+                        System.arraycopy(ridesleftmsg, 0, logmessage, message.length + 2, ridesleftmsg.length);
+                        onMessageReceived.onMessage(logmessage);
+                    }
                 }
-                int i = 0;
-                for (i = 0; i < 16; i++) {
-                    byte[] message = ("Ticket " + (i + 1) + ": ").getBytes();
-                    byte[] logmessage = new byte[message.length + 2];
-                    System.arraycopy(message, 0, logmessage, 0, message.length);
-                    byte[] currentcounter = new byte[1];
-                    currentcounter[0] = contractcounters[i];
-                    byte[] currentcounterbytes = bytesToHex(currentcounter).getBytes();
-                    logmessage[logmessage.length - 2] = currentcounterbytes[0];
-                    logmessage[logmessage.length - 1] = currentcounterbytes[1];
-                    onMessageReceived.onMessage(logmessage);
-                    i++;
-                }
+            } catch (Exception e) {
+                onMessageReceived.onError(e);
             }
-          }
-        catch (IOException e) {
-            onMessageReceived.onError(e);
         }
     }
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();

@@ -2,11 +2,16 @@ package com.mobib.reader;
 
 
 import android.app.Activity;
+import android.content.Context;
 import android.nfc.NfcAdapter;
 import android.nfc.NfcAdapter.ReaderCallback;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
+import android.os.Vibrator;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ListView;
 import com.mobib.reader.IsoDepTransceiver.OnMessageReceived;
 
@@ -15,12 +20,13 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
     private NfcAdapter nfcAdapter;
     private ListView listView;
     private IsoDepAdapter isoDepAdapter;
+    private IsoDepTransceiver isoDepTransceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        listView = (ListView)findViewById(R.id.listView);
+        listView = (ListView) findViewById(R.id.listView);
         isoDepAdapter = new IsoDepAdapter(getLayoutInflater());
         listView.setAdapter(isoDepAdapter);
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
@@ -29,7 +35,10 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
     @Override
     public void onResume() {
         super.onResume();
-        nfcAdapter.enableReaderMode(this, this, NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK | NfcAdapter.FLAG_READER_NFC_B,
+        if (nfcAdapter == null) {
+            nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+        }
+        nfcAdapter.enableReaderMode(this, this, NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK | NfcAdapter.FLAG_READER_NFC_B,
                 null);
     }
 
@@ -37,14 +46,18 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
     public void onPause() {
         super.onPause();
         nfcAdapter.disableReaderMode(this);
+        nfcAdapter = null;
     }
 
     @Override
     public void onTagDiscovered(Tag tag) {
         IsoDep isoDep = IsoDep.get(tag);
-        IsoDepTransceiver transceiver = new IsoDepTransceiver(isoDep, this);
-        Thread thread = new Thread(transceiver);
+        this.isoDepTransceiver = new IsoDepTransceiver(isoDep, this);
+        Thread thread = new Thread(this.isoDepTransceiver);
         thread.start();
+
+        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        v.vibrate(100);
     }
 
     @Override
@@ -58,10 +71,25 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
             }
         });
     }
+
+    @Override
+    public void clearmessages() {
+        runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                //isoDepAdapter.addMessage(bytesToHex(message));
+                isoDepAdapter.clearMessages();
+            }
+        });
+    }
+
+
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
-        for ( int j = 0; j < bytes.length; j++ ) {
+        for (int j = 0; j < bytes.length; j++) {
             int v = bytes[j] & 0xFF;
             hexChars[j * 2] = hexArray[v >>> 4];
             hexChars[j * 2 + 1] = hexArray[v & 0x0F];
@@ -72,8 +100,17 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
     @Override
     public void onError(Exception exception) {
         String errormsg = exception.getMessage();
-        if(errormsg != null) {
+        if (errormsg != null) {
             onMessage(errormsg.getBytes());
+        } else {
+            onMessage("Communication error, please try again".getBytes());
         }
+
+        this.isoDepTransceiver = null;
+        nfcAdapter.disableReaderMode(this);
+        nfcAdapter = null;
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+        nfcAdapter.enableReaderMode(this, this, NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK | NfcAdapter.FLAG_READER_NFC_B,
+                null);
     }
 }
