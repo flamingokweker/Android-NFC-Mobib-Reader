@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MOBIB Reader</string>
+    <string name="app_name">MoBIB Reader</string>
     <string name="action_settings">Settings</string>
     <string name="aiddescription">aiddescription</string>
     <string name="servicedesc">servicedesc</string>
