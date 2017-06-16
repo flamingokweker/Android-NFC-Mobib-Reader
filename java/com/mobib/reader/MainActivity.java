@@ -10,9 +10,12 @@ import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.view.View;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.TabHost;
+
 import com.mobib.reader.IsoDepTransceiver.OnMessageReceived;
 
 public class MainActivity extends Activity implements OnMessageReceived, ReaderCallback {
@@ -25,11 +28,28 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //Remove title bar
+        this.requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
         listView = (ListView) findViewById(R.id.listView);
         isoDepAdapter = new IsoDepAdapter(getLayoutInflater());
         listView.setAdapter(isoDepAdapter);
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+
+        TabHost host = (TabHost)findViewById(R.id.tabHost);
+        host.setup();
+
+        //Tab 1
+        TabHost.TabSpec spec = host.newTabSpec("Scan");
+        spec.setContent(R.id.linearLayoutScan);
+        spec.setIndicator("Scan");
+        host.addTab(spec);
+
+        //Tab 2
+        spec = host.newTabSpec("Help");
+        spec.setContent(R.id.linearLayoutHelp);
+        spec.setIndicator("Help");
+        host.addTab(spec);
     }
 
     @Override
@@ -37,6 +57,13 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
         super.onResume();
         if (nfcAdapter == null) {
             nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+            try {
+                wait(500);
+            }
+            catch(Exception ex)
+            {
+
+            }
         }
         nfcAdapter.enableReaderMode(this, this, NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK | NfcAdapter.FLAG_READER_NFC_B,
                 null);
@@ -67,7 +94,7 @@ public class MainActivity extends Activity implements OnMessageReceived, ReaderC
             @Override
             public void run() {
                 //isoDepAdapter.addMessage(bytesToHex(message));
-                isoDepAdapter.addMessage(new String(message));
+                isoDepAdapter.addMessage(new String(message).replace("0A","10"));
             }
         });
     }

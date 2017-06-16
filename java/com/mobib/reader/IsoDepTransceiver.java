@@ -25,7 +25,7 @@ public class IsoDepTransceiver implements Runnable {
         this.isoDep = isoDep;
         this.onMessageReceived = onMessageReceived;
         this.select_apdu = new byte[] { (byte) 0x94, (byte)0xA4, 0x00, 0x00, (byte) 0x02, (byte)0x20, 0x69, 0x00 };
-        this.readrecord_apdu = new byte[] { (byte) 0x94, (byte)0xB2, 0x01, 0x04, 0x1D };
+        this.readrecord_apdu = new byte[] { (byte) 0x94, (byte)0xB2, 0x01, 0x04, 0x00 };
     }
 
     @Override
@@ -49,19 +49,21 @@ public class IsoDepTransceiver implements Runnable {
                 response = isoDep.transceive(readrecord_apdu);
                 if (response != null) {
                     byte contractcounters;
-                    for (int i = 0; i < 6; i++) {
+                    for (int i = 0; (i*3)+3 < response.length -1; i++) {
                         contractcounters = (byte) (response[(i * 3)] + response[(i * 3) + 1] + response[(i * 3) + 2]);
-                        byte[] message = ("Ticket " + (i + 1) + ": ").getBytes();
-                        byte[] ridesleftmsg = " rides left.".getBytes();
-                        byte[] logmessage = new byte[message.length + ridesleftmsg.length + 2];
-                        System.arraycopy(message, 0, logmessage, 0, message.length);
-                        byte[] currentcounter = new byte[1];
-                        currentcounter[0] = contractcounters;
-                        byte[] currentcounterbytes = bytesToHex(currentcounter).getBytes();
-                        logmessage[message.length] = currentcounterbytes[0];
-                        logmessage[message.length + 1] = currentcounterbytes[1];
-                        System.arraycopy(ridesleftmsg, 0, logmessage, message.length + 2, ridesleftmsg.length);
-                        onMessageReceived.onMessage(logmessage);
+                        if (contractcounters > 0) {
+                            byte[] message = ("Ticket " + (i + 1) + ": ").getBytes();
+                            byte[] ridesleftmsg = " rides left.".getBytes();
+                            byte[] logmessage = new byte[message.length + ridesleftmsg.length + 2];
+                            System.arraycopy(message, 0, logmessage, 0, message.length);
+                            byte[] currentcounter = new byte[1];
+                            currentcounter[0] = contractcounters;
+                            byte[] currentcounterbytes = bytesToHex(currentcounter).getBytes();
+                            logmessage[message.length] = currentcounterbytes[0];
+                            logmessage[message.length + 1] = currentcounterbytes[1];
+                            System.arraycopy(ridesleftmsg, 0, logmessage, message.length + 2, ridesleftmsg.length);
+                            onMessageReceived.onMessage(logmessage);
+                        }
                     }
                 }
             } catch (Exception e) {
